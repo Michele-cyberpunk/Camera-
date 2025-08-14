@@ -1,0 +1,6 @@
+{
+  "name": "Fujifilm AI Dodge & Burn Studio",
+  "description": "An AI-powered photo enhancement studio using the Gemini API. Perform advanced dodge & burn, lighting style adjustments, and color harmonization based on reference images.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
