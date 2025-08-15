@@ -4,11 +4,11 @@ import ImageUploader from './components/ImageUploader';
 import ControlPanel from './components/ControlPanel';
 import ImageViewer from './components/ImageViewer';
 import { CameraIcon } from './components/icons';
-import { generateEnhancedImage, extractColorsFromImage, applyColorTransfer } from './services/geminiService';
+import { generateEnhancedImage, extractColorsFromImage, applyColorTransfer, suggestDodgeAndBurn } from './services/geminiService';
 import ColorHarmonizationPanel from './components/ColorHarmonizationPanel';
 
 type ProcessingStep = 'upload' | 'dodge_burn' | 'harmonization' | 'done';
-type LoadingAction = 'dodge_burn' | 'extract' | 'apply' | null;
+type LoadingAction = 'dodge_burn' | 'extract' | 'apply' | 'suggest' | null;
 
 const stepsConfig = [
   { id: 'upload', name: 'Passo 1: Carica' },
@@ -189,6 +189,32 @@ const App: React.FC = () => {
     }
   }, [imageState.afterUrl, selectedColors]);
 
+  const handleSuggestDodgeBurn = useCallback(async () => {
+    if (!imageState.file || !imageState.mimeType) {
+      setError("Nessun file immagine selezionato.");
+      return;
+    }
+
+    setLoadingAction('suggest');
+    setError(null);
+
+    try {
+      const base64data = await fileToBase64(imageState.file);
+      const suggestion = await suggestDodgeAndBurn(
+          base64data,
+          imageState.mimeType!,
+          creativePrompt
+      );
+      setDodge(suggestion.dodge);
+      setBurn(suggestion.burn);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Si è verificato un errore sconosciuto.";
+      setError(errorMessage);
+    } finally {
+      setLoadingAction(null);
+    }
+  }, [imageState.file, imageState.mimeType, creativePrompt]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-800 text-gray-100 font-sans">
       <header className="flex items-center p-4 border-b border-gray-700 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-20">
@@ -219,6 +245,7 @@ const App: React.FC = () => {
                         lightingStyle={lightingStyle} setLightingStyle={setLightingStyle}
                         creativePrompt={creativePrompt} setCreativePrompt={setCreativePrompt}
                         onProcess={handleProcessDodgeBurn}
+                        onSuggest={handleSuggestDodgeBurn}
                         loadingAction={loadingAction}
                     />
                 )}

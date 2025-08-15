@@ -210,3 +210,67 @@ export const applyColorTransfer = async (
         return Promise.reject(new Error("Si è verificato un errore sconosciuto durante l'armonizzazione dei colori."));
     }
 };
+
+export const suggestDodgeAndBurn = async (
+    base64Data: string,
+    mimeType: string,
+    creativePrompt: string
+): Promise<{ dodge: number; burn: number }> => {
+    try {
+        const imagePart = fileToGenerativePart(base64Data, mimeType);
+        const prompt = `You are an expert photo analyst. Your task is to analyze the provided image and suggest optimal "Dodge & Burn" values for a professional retouch.
+
+- **Image Analysis:** Examine the image's histogram, subject matter, and lighting.
+- **User Guidance:** ${creativePrompt ? `The user wants to achieve this mood: "${creativePrompt}".` : "The user has not provided specific guidance. Aim for a natural, balanced enhancement."}
+- **Output:** Based on your analysis, provide a JSON object with two keys:
+  - "dodge": An integer between 0 and 100 representing the recommended intensity for brightening highlights. A value of 50 is neutral.
+  - "burn": An integer between 0 and 100 representing the recommended intensity for darkening shadows. A value of 50 is neutral.
+
+**Example Response:**
+{
+  "dodge": 65,
+  "burn": 58
+}
+
+**Critical Rule: Your output MUST be a valid JSON object only. Do not output any text, explanation, or markdown formatting. Just the JSON.**`;
+
+        const textPart = { text: prompt };
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: { parts: [imagePart, textPart] },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        dodge: {
+                            type: Type.NUMBER,
+                            description: "Recommended dodge intensity (0-100)."
+                        },
+                        burn: {
+                            type: Type.NUMBER,
+                            description: "Recommended burn intensity (0-100)."
+                        }
+                    }
+                }
+            }
+        });
+
+        const jsonText = response.text.trim();
+        const parsedJson = JSON.parse(jsonText);
+
+        if (parsedJson && typeof parsedJson.dodge === 'number' && typeof parsedJson.burn === 'number') {
+            return parsedJson;
+        } else {
+            throw new Error("L'API non ha restituito i valori di dodge & burn previsti.");
+        }
+
+    } catch (error) {
+        console.error("Error suggesting dodge and burn values:", error);
+        if (error instanceof Error) {
+            return Promise.reject(new Error(`Impossibile suggerire i valori: ${error.message}`));
+        }
+        return Promise.reject(new Error("Si è verificato un errore sconosciuto durante il suggerimento dei valori."));
+    }
+};
